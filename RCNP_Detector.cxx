@@ -17,7 +17,10 @@ vector<UInt_t> GR_V830;
 vector<UShort_t> FERA_Type;
 vector<UShort_t> FERA_Ch;
 vector<UShort_t> FERA_Mid;
-UShort_t FERA_Data[64];
+UShort_t GR_FERA_ADC[64];
+UShort_t LAS_FERA_ADC[64];
+UShort_t GR_FERA_TDC[64];
+UShort_t LAS_FERA_TDC[64];
 
 //static char *fera_name[4] = { "GR_FERA_ADC", "LAS_FERA_ADC", "GR_FERA_TDC", "LAS_FERA_TDC"}
 
@@ -135,7 +138,10 @@ void RCNP_Detector::RegisterData(TTree& tree)
   tree.Branch("FERA_Type", &FERA_Type);
   tree.Branch("FERA_Ch", &FERA_Ch);
   tree.Branch("FERA_Mid", &FERA_Mid);
-  tree.Branch("FERA_Data", &FERA_Data, "FERA_Data[64]/S");
+  tree.Branch("GR_FERA_ADC", &GR_FERA_ADC, "GR_FERA_ADC[64]/S");
+  tree.Branch("LAS_FERA_ADC", &LAS_FERA_ADC, "LAS_FERA_ADC[64]/S");
+  tree.Branch("GR_FERA_TDC", &GR_FERA_TDC, "GR_FERA_TDC[64]/S");
+  tree.Branch("LAS_FERA_TDC", &LAS_FERA_TDC, "LAS_FERA_TDC[64]/S");
 }
 
 void RCNP_Detector::Process(const vector< UShort_t >& data)
@@ -174,6 +180,8 @@ void RCNP_Detector::Process(const vector< UShort_t >& data)
     else if(R.RID == R.ID_V830){
       for(Int_t i = pos; i < pos+R.RSize; i+=2)
         GR_V830.push_back(data[i] | (data[i+1] << 16));
+      
+      //TODO
     }
     else if(R.RID == R.ID_FERA_ADC || R.RID == R.ID_FERA_TDC){
       FeraHeader FH;
@@ -187,7 +195,14 @@ void RCNP_Detector::Process(const vector< UShort_t >& data)
         else{
           FD.Read(data[i]);
           FERA_Ch.push_back(FD.Channel);
-          FERA_Data[FD.Channel+16*FH.Mid] = FD.Data;
+          if(FH.Type == 0)
+            GR_FERA_ADC[FD.Channel+16*FH.Mid] = FD.Data;
+          else if(FH.Type == 1)
+            LAS_FERA_ADC[FD.Channel+16*FH.Mid] = FD.Data;
+          else if(FH.Type == 8)
+            GR_FERA_TDC[FD.Channel+16*FH.Mid] = FD.Data;
+          else if(FH.Type == 9)
+            LAS_FERA_ADC[FD.Channel+16*FH.Mid] = FD.Data;
         }
       }
     }
@@ -213,5 +228,8 @@ void RCNP_Detector::Clear()
   FERA_Mid.clear();
   Time = 0;
   ChkSum = 0;
-  memset(FERA_Data, 0, sizeof(FERA_Data));
+  memset(GR_FERA_ADC, 0, sizeof(GR_FERA_ADC));
+  memset(LAS_FERA_ADC, 0, sizeof(LAS_FERA_ADC));
+  memset(GR_FERA_TDC, 0, sizeof(GR_FERA_TDC));
+  memset(LAS_FERA_TDC, 0, sizeof(LAS_FERA_TDC));
 }

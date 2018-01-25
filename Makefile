@@ -6,7 +6,7 @@ SOFLAGS   = -fPIC -shared
 .PHONY: all
 all: unpacker
 
-unpacker: main.o Unpacker.o
+unpacker: main.o Unpacker.o RCNP_Detector.o
 	@echo "Buildung 'unpacker'..."
 	@$(CXX) -o $@ $^ $(LDFLAGS) -lz -O3
 
@@ -15,4 +15,7 @@ clean:
 	@rm -f *.o unpacker
 
 %.o: %.cxx Makefile
+	@$(CXX) -c -o $@ $< $(CXXFLAGS)
+
+%.o: %.h %.cxx Makefile
 	@$(CXX) -c -o $@ $< $(CXXFLAGS)

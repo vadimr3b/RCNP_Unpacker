@@ -45,7 +45,6 @@ int main(const int narg, const char* argv[]){
     cout << "Unpacking '" << targets[i] << "'" << endl;
     TString fout = fdir + fname.ReplaceAll(".bld", ".root");
     Unpacker u;
-    u.SetName("test");
     
     RCNP_Detector rcnp;
     
