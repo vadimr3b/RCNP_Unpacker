@@ -12,7 +12,6 @@ using std::map;
 
 #include "Detector.h"
 
-
 enum STATUS : int {DONE, ERR_OPEN, ERR_CREATE, ERR_UNKNOWN_FORMAT, ERR_UNEXPECTED_EOF, ERR_UNKNOWN_DATA_STRUCTURE,
                    ERR_UNIMPLEMENTED, ERR_EVENT_NUMBER_MISMATCH};
                    
@@ -21,8 +20,8 @@ public:
     
     Unpacker();
     
-    void AddDetector(Detector& detector){
-        detectors[detector.GetFieldID()] = &detector;
+    void AddDetector(Detector* detector){
+        detectors[detector->GetFieldID()] = detector;
     }
     
     void SetName(TString& name){
@@ -33,8 +32,8 @@ public:
          this->name = name;
     }
     
-    STATUS Unpack(TString& filein, TString& fileout, uint32_t maxevents = -1);
-    
+    STATUS Unpack(TString& filein, TString& fileout, uint32_t maxblocks = -1);
+
 private:
     TString name;
     map<UShort_t, Detector*> detectors;

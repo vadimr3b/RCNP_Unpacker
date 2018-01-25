@@ -4,3 +4,5 @@ Unpacker\.o
 main\.o
 
 unpacker
+
+*.o
