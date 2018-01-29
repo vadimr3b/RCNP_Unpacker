@@ -22,7 +22,18 @@ UShort_t LAS_FERA_ADC[64];
 UShort_t GR_FERA_TDC[64];
 UShort_t LAS_FERA_TDC[64];
 
-//static char *fera_name[4] = { "GR_FERA_ADC", "LAS_FERA_ADC", "GR_FERA_TDC", "LAS_FERA_TDC"}
+UShort_t GR_ADC[6];
+UShort_t GR_MADC[6];
+UShort_t GR_TDC[6];
+UShort_t GR_RF[3];
+UShort_t GR_TLAS;
+UShort_t GR_TPOS[2];
+
+UShort_t LAS_ADC[12];
+UShort_t LAS_MADC[6];
+UShort_t LAS_TDC[12];
+UShort_t LAS_RF[3];
+UShort_t LAS_TPOS[6];
 
 vector<UInt_t> Scaler;
 UInt_t Time;

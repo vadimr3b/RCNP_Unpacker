@@ -216,11 +216,13 @@ struct RunComment{
             comment[pos++] = temp & 0x00FF;
         }
         
+        Comment = TString(comment);
+        
         return true;
     }
     
     void Print(){
-        Printf("'%s'", comment);        
+        cout << "'" << Comment << "'" << endl;
     }
     
     UShort_t version;
@@ -229,7 +231,9 @@ struct RunComment{
     UInt_t time;
     UShort_t run;
     UShort_t res2;
-    UChar_t comment[124];
+    Char_t comment[124];
+    
+    TString Comment;
     
     static constexpr UShort_t _HSize = 140;
 };
@@ -310,8 +314,8 @@ STATUS Unpacker::Unpack(TString& filein, TString& fileout, uint32_t maxblocks)
     
     gzFile ifs(gzopen(filein, "rb"));
     if(ifs == Z_NULL) return ERR_OPEN;
-    TFile ofs(fileout, "RECREATE");
-    if(!ofs.IsOpen()) return ERR_CREATE;
+    TFile fout(fileout, "RECREATE");
+    if(!fout.IsOpen()) return ERR_CREATE;
     
     TTree tree(name, name);
     for(auto it = detectors.begin(); it != detectors.end(); ++it){
@@ -325,7 +329,6 @@ STATUS Unpacker::Unpack(TString& filein, TString& fileout, uint32_t maxblocks)
     BlockHeader BH;
     BlockTrailer BT;
     UShort_t temp;
-    UInt_t detnumber;
     
     while(BH.__BlockNumber < maxblocks && !gzeof(ifs)){
         BLDH.Read(ifs);
@@ -342,7 +345,7 @@ STATUS Unpacker::Unpack(TString& filein, TString& fileout, uint32_t maxblocks)
         cout << "BLD1: HSize = " << hex << BLDH.HSize/2 << "   BSize = " << hex << BLDH.BSize/2 << endl;
         #endif
         if(gzeof(ifs)){
-          ofs.Write();
+          fout.Write();
           return DONE;
         }
         if(!BH.Read(ifs)) return ERR_UNKNOWN_DATA_STRUCTURE;
@@ -373,13 +376,12 @@ STATUS Unpacker::Unpack(TString& filein, TString& fileout, uint32_t maxblocks)
                 #endif 
                 for(UInt_t event = 0; event < BH.EventNumber; ++event){
                     if(gzeof(ifs)){
-                      ofs.Write();
+                      fout.Write();
                       return DONE;
                     }
                       
                     if(!EH.Read(ifs)) return ERR_UNKNOWN_DATA_STRUCTURE;
                     BH.BSize32 -= EH._HSize + EH.ESize;
-                    detnumber = 0;
                     #ifdef DEBUG
                     cout << "  Reading Event #" << dec << EH.EventNumber  << " (" << hex << EH._HSize + EH.ESize << ")   (Bsize left: " << hex << BH.BSize32 << ")" << endl;
                     #endif
@@ -423,7 +425,7 @@ STATUS Unpacker::Unpack(TString& filein, TString& fileout, uint32_t maxblocks)
         //return DONE;
     }
     
-    ofs.Write();
+    fout.Write();
     return DONE;
 }
 
