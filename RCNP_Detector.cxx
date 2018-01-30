@@ -2,6 +2,7 @@
 using std::vector;
 #include <iostream>
 using std::cout;
+using std::cerr;
 using std::endl;
 using std::hex;
 
@@ -123,6 +124,83 @@ struct FeraData{
   UShort_t Data;          /* Data */
 };
 
+struct V1190Data{
+  void Read(UInt_t data){
+      ID = data & 0x1F;
+      switch(ID){
+          case(ID_GlobalHeader):
+              Geo = (data >> 27) & 0x1F;
+              EventCount = (data >> 5) & 0x3FFFFF;
+              break;
+          case(ID_TDCHeader):
+              BunchID = (data >> 20) & 0xFFF;
+              EventID = (data >> 8) & 0xFFF;
+              TDC = (data >> 6) & 0x3;
+              break;
+          case(ID_TDCMeasurment):
+              Measurement = (data >> 13) & 0x7FFFF;
+              Channel = (data >> 6) & 0x7F;
+              break;
+          case(ID_TDCTrailer):
+              Geo = (data >> 27) & 0x1F;
+              EventID = (data >> 8) & 0xFFF;
+              TDC = (data >> 6) & 0x3;
+              break;
+          case(ID_TDCErrorr):
+              ErrorFlags = (data >> 17) & 0x7FFF;
+              TDC = (data >> 6) & 0x3;
+              break;
+          case(ID_ETTT):
+              TimeTag = (data >> 5) & 0x3FFFFFF;
+              break;
+          case(ID_GlobalTrailer):
+              Geo = (data >> 27) & 0x1F;
+              WordCount = (data >> 11) & 0xFFFF;
+              Status = (data >> 5) & 0x7;
+              break;
+          default:
+          cerr << "Unknown V1190 Data ID: " << ID << endl; 
+      }
+  }
+  
+  /*Common*/
+  UShort_t ID;
+  UShort_t TDC;
+  UShort_t Geo;
+  UShort_t WordCount;
+  UShort_t EventID;
+  
+  /*Global Header (ID == 8)*/
+  static constexpr UShort_t ID_GlobalHeader = 8;
+  UInt_t EventCount;
+  
+  /*TDC Header (ID == 1)*/
+  static constexpr UShort_t ID_TDCHeader = 1;
+  UShort_t BunchID;
+  
+  /*TDC Measurement (ID == 0)*/
+  static constexpr UShort_t ID_TDCMeasurment = 0;
+  UInt_t Measurement;
+  UShort_t Channel;
+  UShort_t Edge; /*0 = leading, 1 = trailing*/
+  
+  /*TDC Trailer (ID == 3)*/
+  static constexpr UShort_t ID_TDCTrailer= 3;
+  
+  /*TDC Error (ID == 4)*/
+  static constexpr UShort_t ID_TDCErrorr = 4;
+  UShort_t ErrorFlags;
+  
+  /*Extended Trigger Time Tag (ID == 17)*/
+  static constexpr UShort_t ID_ETTT = 17;
+  UInt_t TimeTag;
+  
+  /*Global Trailer (ID == 16)*/
+  static constexpr UShort_t ID_GlobalTrailer = 16;
+  UShort_t Status;
+    
+};
+
 RCNP_Detector::RCNP_Detector()
 {
 }
@@ -155,66 +233,81 @@ void RCNP_Detector::Process(const vector< UShort_t >& data)
   while(pos < data.size()){
     R.Read(data, pos);
     RegionIDs.push_back(R.RID);
+    
+    switch(R.RID){
+        case(R.ID_Reserved): break;
+        
+        case( R.ID_V1190):
+            UInt_t temp;
+            V1190Data V1190D;
+            for(Int_t i = pos; i < pos+R.RSize; ++i){
+                temp = data[i] | (data[i+1] << 16);
+                i+=2;
+                V1190D.Read(temp);
+            }
+            break;
 
-    if(R.RID == R.ID_Reserved){
-    }
-    else if(R.RID == R.ID_V1190){
-      //TODO
-    }
-    else if(R.RID == R.ID_NimIn){
-      for(Int_t i = pos; i < pos+R.RSize; ++i)
-        IPR.push_back(data[i]);
-    }
-    else if(R.RID == R.ID_ADC){
-      for(Int_t i = pos; i < pos+R.RSize; ++i)
-        GR_ADC_OLD.push_back(data[i]);
-        //GR_ADC_OLD[i-pos] = (data[i]);
-    }
-    else if(R.RID == R.ID_Scaler){
-      for(Int_t i = pos; i < pos+R.RSize; i+=2){
-        if(bigEndian)
-          Scaler.push_back(data[i] | (data[i+1] << 16));
-        else
-          Scaler.push_back(data[i+1] | (data[i] << 16));
-      }
-    }
-    else if(R.RID == R.ID_UNIX_TIME){
-      Time = (data[pos] | (data[pos+1] << 16));
-    }
-    else if(R.RID == R.ID_V830){
-      for(Int_t i = pos; i < pos+R.RSize; i+=2)
-        GR_V830.push_back(data[i] | (data[i+1] << 16));
+        case(R.ID_NimIn):
+            for(Int_t i = pos; i < pos+R.RSize; ++i)
+                IPR.push_back(data[i]);
+            break;
+            
+        case(R.ID_ADC):
+            for(Int_t i = pos; i < pos+R.RSize; ++i)
+                GR_ADC_OLD.push_back(data[i]);
+            //GR_ADC_OLD[i-pos] = (data[i]);
+            break;
+            
+        case(R.ID_Scaler):
+            for(Int_t i = pos; i < pos+R.RSize; i+=2){
+                if(bigEndian)
+                Scaler.push_back(data[i] | (data[i+1] << 16));
+                else
+                Scaler.push_back(data[i+1] | (data[i] << 16));
+            }
+            break;
       
-      //TODO
-    }
-    else if(R.RID == R.ID_FERA_ADC || R.RID == R.ID_FERA_TDC){
-      FeraHeader FH;
-      FeraData FD;
-      for(Int_t i = pos; i < pos+R.RSize; ++i){
-        if(FH.IsHeader(data[i])){
-          FH.Read(data[i]);
-          FERA_Type.push_back(FH.Type);
-          FERA_Mid.push_back(FH.Mid);
-        }
-        else{
-          FD.Read(data[i]);
-          FERA_Ch.push_back(FD.Channel);
-          if(FH.Type == 0)
-            FERA_RAW.GR_FERA_ADC[FD.Channel+16*FH.Mid] = FD.Data;
-          else if(FH.Type == 1)
-            FERA_RAW.LAS_FERA_ADC[FD.Channel+16*FH.Mid] = FD.Data;
-          else if(FH.Type == 8)
-            FERA_RAW.GR_FERA_TDC[FD.Channel+16*FH.Mid] = FD.Data;
-          else if(FH.Type == 9)
-            FERA_RAW.LAS_FERA_ADC[FD.Channel+16*FH.Mid] = FD.Data;
-        }
-      }
-    }
-    else if(R.RID == R.ID_CHKSUM){
-      ChkSum = data[pos];
-    }
-    else{
-      cout << "Unhandeld Region found: " << hex << R.RID << endl;
+        case(R.ID_UNIX_TIME):
+            Time = (data[pos] | (data[pos+1] << 16));
+            break;
+
+        case(R.ID_V830):
+            for(Int_t i = pos; i < pos+R.RSize; i+=2)
+                GR_V830.push_back(data[i] | (data[i+1] << 16));
+            //NOTE Only Debug purpose?
+            break;
+
+        case(R.ID_FERA_ADC):
+        case(R.ID_FERA_TDC):
+            FeraHeader FH;
+            FeraData FD;
+            for(Int_t i = pos; i < pos+R.RSize; ++i){
+                if(FH.IsHeader(data[i])){
+                    FH.Read(data[i]);
+                    FERA_Type.push_back(FH.Type);
+                    FERA_Mid.push_back(FH.Mid);
+                }
+                else{
+                    FD.Read(data[i]);
+                    FERA_Ch.push_back(FD.Channel);
+                    if(FH.Type == 0)
+                        FERA_RAW.GR_FERA_ADC[FD.Channel+16*FH.Mid] = FD.Data;
+                    else if(FH.Type == 1)
+                        FERA_RAW.LAS_FERA_ADC[FD.Channel+16*FH.Mid] = FD.Data;
+                    else if(FH.Type == 8)
+                        FERA_RAW.GR_FERA_TDC[FD.Channel+16*FH.Mid] = FD.Data;
+                    else if(FH.Type == 9)
+                        FERA_RAW.LAS_FERA_ADC[FD.Channel+16*FH.Mid] = FD.Data;
+                }
+            }
+            break;
+            
+        case(R.ID_CHKSUM):
+            ChkSum = data[pos];
+            break;
+            
+        default:
+            cout << "Unhandeld Region found: " << hex << R.RID << endl;
     }
     pos += R.RSize;
   }

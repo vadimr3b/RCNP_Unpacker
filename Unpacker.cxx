@@ -278,8 +278,8 @@ struct EventHeader{
     static constexpr UShort_t _HSize = 6;
 };
 
-struct FieldHedaer{
-    FieldHedaer(){};
+struct FieldHeader{
+    FieldHeader(){};
     
     bool Read(gzFile& ifs){
         ReadFSShort(ifs, &HID);
@@ -351,7 +351,7 @@ STATUS Unpacker::Unpack(TString& filein, TString& fileout, uint32_t maxblocks)
         if(!BH.Read(ifs)) return ERR_UNKNOWN_DATA_STRUCTURE;
         
         EventHeader EH;
-        FieldHedaer FH;
+        FieldHeader FH;
         
         while(BH.BSize32 > BT._HSize){
             #ifdef DEBUG
