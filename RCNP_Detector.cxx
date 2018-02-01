@@ -26,6 +26,31 @@ _GF GF;
 _LAS LAS;
 UShort_t BLP_ADC[8];
 
+vector<UShort_t> GR_WIRE_X1;
+vector<UShort_t> GR_WIRE_U1;
+vector<UShort_t> GR_WIRE_X2;
+vector<UShort_t> GR_WIRE_U2;
+vector<Float_t> GR_TDC_X1;
+vector<Float_t> GR_TDC_U1;
+vector<Float_t> GR_TDC_X2;
+vector<Float_t> GR_TDC_U2;
+
+vector<UShort_t> LAS_WIRE_X1;
+vector<UShort_t> LAS_WIRE_U1;
+vector<UShort_t> LAS_WIRE_V1;
+vector<UShort_t> LAS_WIRE_X2;
+vector<UShort_t> LAS_WIRE_U2;
+vector<UShort_t> LAS_WIRE_V2;
+vector<Float_t> LAS_TDC_X1;
+vector<Float_t> LAS_TDC_U1;
+vector<Float_t> LAS_TDC_V1;
+vector<Float_t> LAS_TDC_X2;
+vector<Float_t> LAS_TDC_U2;
+vector<Float_t> LAS_TDC_V2;
+
+vector<_V1190_RAW> V1190_RAW;
+Int_t V1190_QTC[16][2];
+
 vector<UInt_t> Scaler;
 UInt_t Time;
 
@@ -64,28 +89,17 @@ struct Region{
 
 struct FeraHeader{
   void Read(UShort_t data){
-    if(bigEndian){
-      Header = data & 0x1;
-      Count = data & 0x1E;
-      Reserved = data & 0xE0;
-      VStationNum = data & 0xFF00;
-    }
-    else{
-      Header = (data & 0x8000) >> 15;
-      Count = (data & 0x7000) >> 12;
-      Reserved = data & 0xF00 >> 8;
-      VStationNum = data & 0xFF;
-    }
+    Header = (data >> 15) & 0x1;
+    Count = (data >> 11) & 0xF;
+    Reserved = (data >> 8) & 07;
+    VStationNum = (data >> 0) & 0xFF;
     
     Type = (VStationNum & 0xF0) >> 4;
     Mid = (VStationNum & 0xF);
   }
   
   Bool_t IsHeader(UShort_t data){
-    if(bigEndian)
-      return data & 0x1;
-    else
-      return (data & 0x8000) >> 15;
+    return ((data >> 15) & 0x1);
   }
   
   UShort_t Header;        /* Identifies header word  (=1) */
@@ -98,25 +112,13 @@ struct FeraHeader{
 
 struct FeraData{
   void Read(UShort_t data){
-    if(bigEndian){
-      Header = data & 0x1;
-      Channel = data & 0x1E;
-      Data = data & 0xFFE0;
-    }
-    else{
-      Header = (data & 0x8000) >> 15;
-      Channel = (data & 0x7000) >> 12;
-      Data = data & 0x7FF;
-    }
-    
-
+    Header = (data >> 15) & 0x1;
+    Channel = (data >> 11) & 0xF;
+    Data = (data >> 0) & 0x7FF;
   }
   
   Bool_t IsData(UShort_t data){
-    if(bigEndian)
-      return !(data & 0x1);
-    else
-      return !((data & 0x8000) >> 15);
+    return !((data >> 15) & 0x1);
   }
   
   UShort_t Header;        /* Identifies header word (=0) */ 
@@ -124,50 +126,127 @@ struct FeraData{
   UShort_t Data;          /* Data */
 };
 
+#define V1190_MAX_N_MODULES 32
+
+constexpr Short_t V1190_Wire_Map[] = {
+  0, 2, 1, 3, 4, 6, -2, -1, 5, 7, 8, 10, 9, 11, -1, -1,  // X1 plane
+  1, 3, 2, 4, 5, 7,  0, -1, 6, 8, 9, 11,10, 12, -1, -1,  // U1 plane
+  0, 2, 1, 3, 4, 6, -1, -1, 5, 7, 8, 10, 9, 11, -1, -1,  // X2 plane
+  1, 3, 2, 4, 5, 7,  0, -1, 6, 8, 9, 11,10, 12, -1, -1   // U2 plane
+};
+  
 struct V1190Data{
   void Read(UInt_t data){
-      ID = data & 0x1F;
+      ID = (data >> 27) & 0x1F;
       switch(ID){
           case(ID_GlobalHeader):
-              Geo = (data >> 27) & 0x1F;
+              Geo = (data >> 0) & 0x1F;
+              if(0 <= Geo && Geo < 8){
+                IsGeoGR = kTRUE;
+                IsGeoLAS = kFALSE;
+              }
+              else if(8 <= Geo && Geo < 24){
+                IsGeoGR = kFALSE;
+                IsGeoLAS = kTRUE;
+              }
+              else{
+                IsGeoGR = kFALSE;
+                IsGeoLAS = kFALSE;
+              }
               EventCount = (data >> 5) & 0x3FFFFF;
               break;
           case(ID_TDCHeader):
-              BunchID = (data >> 20) & 0xFFF;
-              EventID = (data >> 8) & 0xFFF;
-              TDC = (data >> 6) & 0x3;
+              BunchID = (data >> 0) & 0xFFF;
+              EventID = (data >> 12) & 0xFFF;
+              TDC = (data >> 24) & 0x3;
               break;
           case(ID_TDCMeasurment):
-              Measurement = (data >> 13) & 0x7FFFF;
-              Channel = (data >> 6) & 0x7F;
+              Measurement = (data >> 0) & 0x7FFFF;
+              Channel = (data >> 19) & 0x7F;
+              TrailingEdge = (data >> 26) & 0x1;
               break;
           case(ID_TDCTrailer):
-              Geo = (data >> 27) & 0x1F;
-              EventID = (data >> 8) & 0xFFF;
-              TDC = (data >> 6) & 0x3;
+              WordCount = (data >> 0) & 0xFFF;
+              EventID = (data >> 12) & 0xFFF;
+              TDC = (data >> 24) & 0x3;
               break;
           case(ID_TDCErrorr):
-              ErrorFlags = (data >> 17) & 0x7FFF;
-              TDC = (data >> 6) & 0x3;
+              ErrorFlags = (data >> 0) & 0x7FFF;
+              TDC = (data >> 24) & 0x3;
               break;
           case(ID_ETTT):
-              TimeTag = (data >> 5) & 0x3FFFFFF;
+              TimeTag = (data >> 0) & 0x3FFFFFF;
               break;
           case(ID_GlobalTrailer):
-              Geo = (data >> 27) & 0x1F;
-              WordCount = (data >> 11) & 0xFFFF;
-              Status = (data >> 5) & 0x7;
+              Geo = (data >> 0) & 0x1F;
+              WordCount = (data >> 5) & 0xFFFF;
+              Status = (data >> 24) & 0x7;
               break;
           default:
-          cerr << "Unknown V1190 Data ID: " << ID << endl; 
+            //cerr << "Unknown ID: " << ID << endl;
+            break;
       }
   }
+  
+  Short_t GetBaseTimeChannel(){
+    if(IsGeoGR)
+            return GR_BASE_TIME_CHANNEL;
+    else if(IsGeoLAS){
+            if((Geo & 1) == 0){
+                    return LAS_EVEN_BASE_TIME_CHANNEL;
+            }else{
+                    return LAS_ODD_BASE_TIME_CHANNEL;
+            }
+    }else{
+            cerr << "Unknown geo: " << Geo << endl;
+            return -1;
+    } 
+  }
+  
+  Short_t GetWire(UShort_t geo, UShort_t ch){
+   return (V1190_Wire_Map[(((geo) & 7) << 3) | (((ch) & 0x70) >> 4)] << 4)| ((ch) & 0x0f); 
+  }
+  
+  Short_t GetGRVDCPlane(UShort_t geo, UShort_t ch){
+     return (((geo) & 6) >> 1);
+  }
+  
+  UShort_t GetLASVDCPlane(){
+    if(Geo ==  8 || Geo ==  9 || (Geo == 11 && 96 <= Channel && Channel < 128)) return 1; //X1 plane
+    if(Geo == 12 || Geo == 13) return 2; //U1 plane
+    if(Geo == 14 || Geo == 15) return 3; //V1 plane
+    if(Geo == 16 || Geo == 17 || (Geo == 11 && 32 <= Channel && Channel < 64)) return 4; //X2 plane
+    if(Geo == 20 || Geo == 21) return 5; //U2 plane
+    if(Geo == 22 || Geo == 23) return 6; //V2 plane
+    return 0;
+  }
+  
+  Short_t GetLASVDCWire(){
+      if(Geo==11){
+        if(32 <= Channel && Channel < 64){
+                return 16*16 + (Channel-32);
+        }else if(96 <= Channel && Channel < 128)
+                return 16*16+(Channel - 96);
+      }
+      else
+        return (Geo%2)*128 + Channel;
+      
+      cerr << "Bad Wire!!!" << endl;
+      return -1;
+  }
+  
+
+  
+  static constexpr UShort_t GR_BASE_TIME_CHANNEL = 127;
+  static constexpr UShort_t LAS_EVEN_BASE_TIME_CHANNEL = 0;
+  static constexpr UShort_t LAS_ODD_BASE_TIME_CHANNEL = 127;
   
   /*Common*/
   UShort_t ID;
   UShort_t TDC;
-  UShort_t Geo;
-  UShort_t WordCount;
+  Short_t Geo = -1;
+  Bool_t IsGeoGR;
+  Bool_t IsGeoLAS;
   UShort_t EventID;
   
   /*Global Header (ID == 8)*/
@@ -182,7 +261,7 @@ struct V1190Data{
   static constexpr UShort_t ID_TDCMeasurment = 0;
   UInt_t Measurement;
   UShort_t Channel;
-  UShort_t Edge; /*0 = leading, 1 = trailing*/
+  UShort_t TrailingEdge; /*0 = leading, 1 = trailing*/
   
   /*TDC Trailer (ID == 3)*/
   static constexpr UShort_t ID_TDCTrailer= 3;
@@ -198,6 +277,7 @@ struct V1190Data{
   /*Global Trailer (ID == 16)*/
   static constexpr UShort_t ID_GlobalTrailer = 16;
   UShort_t Status;
+  UShort_t WordCount;
     
 };
 
@@ -220,10 +300,35 @@ void RCNP_Detector::RegisterData(TTree& tree)
   tree.Branch("GR", &GR, "GR_ADC[6]/s:GR_MADC[3]:GR_TDC[6]:GR_RF[3]:GR_TLAS:GR_DIFF[3]");
   tree.Branch("GF", &GF, "GF_ADC_XU[8]/s:GF_ADC_XD[8]:GF_ADC_YL[5]:GF_ADC_YR[5]:GF_MADC_X[8]:GF_MADC_Y[5]:GF_TDC_XU[8]:GF_TDC_XD[8]:GF_TDC_YL[5]:GF_TDC_YR[5]:GF_TDIFF_X[8]:GF_TDIFF_Y[5]");
   tree.Branch("LAS", &LAS, "LAS_ADC[12]/s:LAS_MADC[6]:LAS_TDC[12]:LAS_RF[3]:LAS_TDIFF[6]");
+  
+  tree.Branch("GR_WIRE_X1", &GR_WIRE_X1);
+  tree.Branch("GR_WIRE_U1", &GR_WIRE_U1);
+  tree.Branch("GR_WIRE_X2", &GR_WIRE_X2);
+  tree.Branch("GR_WIRE_U2", &GR_WIRE_U2);
+  
+  tree.Branch("GR_TDC_X1", &GR_TDC_X1);
+  tree.Branch("GR_TDC_U1", &GR_TDC_U1);
+  tree.Branch("GR_TDC_X2", &GR_TDC_X2);
+  tree.Branch("GR_TDC_U2", &GR_TDC_U2);
+  
+  tree.Branch("LAS_WIRE_X1", &LAS_WIRE_X1);
+  tree.Branch("LAS_WIRE_U1", &LAS_WIRE_U1);
+  tree.Branch("LAS_WIRE_V1", &LAS_WIRE_V1);
+  tree.Branch("LAS_WIRE_X2", &LAS_WIRE_X2);
+  tree.Branch("LAS_WIRE_U2", &LAS_WIRE_U2);
+  tree.Branch("LAS_WIRE_V2", &LAS_WIRE_V2);
+  
+  tree.Branch("LAS_TDC_X1", &LAS_TDC_X1);
+  tree.Branch("LAS_TDC_U1", &LAS_TDC_U1);
+  tree.Branch("LAS_TDC_V1", &LAS_TDC_V1);
+  tree.Branch("LAS_TDC_X2", &LAS_TDC_X2);
+  tree.Branch("LAS_TDC_U2", &LAS_TDC_U2);
+  tree.Branch("LAS_TDC_V2", &LAS_TDC_V2);
   //tree.Branch("BLP", &BLP_ADC, "BLP_ADC[8]/s");
   
   Clear();
 }
+#include <bitset>
 
 void RCNP_Detector::Process(const vector< UShort_t >& data)
 {
@@ -235,60 +340,265 @@ void RCNP_Detector::Process(const vector< UShort_t >& data)
     RegionIDs.push_back(R.RID);
     
     switch(R.RID){
-        case(R.ID_Reserved): break;
+        case(R.ID_Reserved):
+          break;
         
-        case( R.ID_V1190):
+        case(R.ID_V1190):{
             UInt_t temp;
-            V1190Data V1190D;
-            for(Int_t i = pos; i < pos+R.RSize; ++i){
-                temp = data[i] | (data[i+1] << 16);
-                i+=2;
-                V1190D.Read(temp);
-            }
-            break;
+            UInt_t localpos = pos;
+            Bool_t insideTDCLoop, insideGlobalLoop;
+            V1190Data V1190D, V1190Check;
+            Int_t BaseTime[V1190_MAX_N_MODULES];
+            for(UInt_t i = 0; i < V1190_MAX_N_MODULES; ++i)
+              BaseTime[i] = -10000;
 
+            while(localpos < pos + R.RSize){
+                temp = (UInt_t(data[localpos+1]) << 16) | (UInt_t(data[localpos]));
+                localpos+=2;
+                V1190D.Read(temp);
+                if(V1190D.ID != V1190D.ID_GlobalHeader){
+                  cerr << "Expected V1190D Global-Header! " << V1190D.ID << endl;
+                  return;
+                }
+                insideGlobalLoop = true;
+                
+                while(insideGlobalLoop){
+                    temp = (UInt_t(data[localpos+1]) << 16) | (UInt_t(data[localpos]));
+                    localpos += 2;
+                    V1190D.Read(temp);
+                    if(V1190D.ID != V1190D.ID_TDCHeader){
+                      cerr << "Expected V1190D TDC-Header! " << V1190D.ID << endl;
+                      if(V1190D.ID != V1190D.ID_GlobalHeader)
+                        return;
+                      temp = (UInt_t(data[localpos+1]) << 16) | (UInt_t(data[localpos]));
+                      localpos += 2;
+                      V1190D.Read(temp);
+                      if(V1190D.ID != V1190D.ID_TDCHeader){
+                        cerr << "Data broken... skipping field!" << endl;
+                        return;
+                      }
+                    }
+                    
+                    insideTDCLoop = true;
+                    while(insideTDCLoop){
+                      temp = (UInt_t(data[localpos+1]) << 16) | (UInt_t(data[localpos]));
+                      localpos += 2;
+                      V1190D.Read(temp);
+                      
+                      switch(V1190D.ID){
+                        case(V1190D.ID_TDCMeasurment):
+                          if(!V1190D.TrailingEdge){
+                            if(V1190D.IsGeoGR || V1190D.IsGeoLAS)
+                              if(V1190D.Channel == V1190D.GetBaseTimeChannel())
+                                BaseTime[V1190D.Geo] = V1190D.Measurement;
+                          }
+                        break;
+                        
+                        case(V1190D.ID_TDCErrorr):
+                          cerr << "V1190D: TDC-Error!" << endl;
+                        break;
+                        
+                        case(V1190D.ID_TDCTrailer):
+                          insideTDCLoop = false;
+                        break;
+                        
+                        default:
+                          cerr << "Unexpected V1190D Block: " << V1190D.ID << endl;
+                          return;
+                      }
+                    }
+                    
+                    temp = (UInt_t(data[localpos+1]) << 16) | (UInt_t(data[localpos]));
+                    V1190Check.Read(temp);
+                    if(V1190Check.ID == V1190Check.ID_GlobalTrailer){
+                      V1190D.Read(temp);
+                      localpos += 2;
+                      insideGlobalLoop = false;
+                    }
+                }
+            }
+            localpos = pos;
+            _V1190_RAW raw;
+            while(localpos < pos + R.RSize){
+                temp = (UInt_t(data[localpos+1]) << 16) | (UInt_t(data[localpos]));
+                localpos+=2;
+                V1190D.Read(temp);
+                if(V1190D.ID != V1190D.ID_GlobalHeader){
+                  cerr << "Expected V1190D Global-Header! " << V1190D.ID << endl;
+                  return;
+                }
+                insideGlobalLoop = true;
+                
+                while(insideGlobalLoop){
+                    temp = (UInt_t(data[localpos+1]) << 16) | (UInt_t(data[localpos]));
+                    localpos += 2;
+                    V1190D.Read(temp);
+                    if(V1190D.ID != V1190D.ID_TDCHeader){
+                      cerr << "Expected V1190D TDC-Header! " << V1190D.ID << endl;
+                      if(V1190D.ID != V1190D.ID_GlobalHeader)
+                        return;
+                      temp = (UInt_t(data[localpos+1]) << 16) | (UInt_t(data[localpos]));
+                      localpos += 2;
+                      V1190D.Read(temp);
+                      if(V1190D.ID != V1190D.ID_TDCHeader){
+                        cerr << "Data broken... skipping field!" << endl; //BUG in DAQ?
+                        return;
+                      }
+                    }
+                    raw.Geo= V1190D.Geo;
+                    
+                    insideTDCLoop = true;
+                    while(insideTDCLoop){
+                      temp = (UInt_t(data[localpos+1]) << 16) | (UInt_t(data[localpos]));
+                      localpos += 2;
+                      V1190D.Read(temp);
+                      
+                      switch(V1190D.ID){
+                        case(V1190D.ID_TDCMeasurment):
+                            raw.Channel = V1190D.Channel;
+                            raw.Wire = V1190D.GetWire(raw.Geo, raw.Channel);
+                            if(BaseTime[raw.Geo] == -10000 && raw.Geo != 10)
+                              cerr << "BaseTime Error!" << endl;
+                            raw.TDC = (V1190D.Measurement - BaseTime[raw.Geo])/10.0;
+                            if(V1190D.Channel > 0)
+                              V1190_RAW.push_back(raw);
+                            if(raw.Geo == 0 && (96 <= raw.Channel && raw.Channel < 112)){
+                              if(V1190D.TrailingEdge)
+                                V1190_QTC[raw.Channel - 96][1] = raw.TDC - BaseTime[raw.Geo];
+                              else
+                                V1190_QTC[raw.Channel - 96][0] = raw.TDC - BaseTime[raw.Geo];
+                            }
+                            
+                            if(!V1190D.TrailingEdge){
+                              if(V1190D.IsGeoGR){
+                                if(raw.Wire >= 0)
+                                  switch(V1190D.GetGRVDCPlane(raw.Geo, raw.Channel)){
+                                      case 0: // X1 Plane
+                                        GR_TDC_X1.push_back(-raw.TDC);
+                                        GR_WIRE_X1.push_back(raw.Wire);
+                                        break;
+                                      case 1: // U1 Plane
+                                        GR_TDC_U1.push_back(-raw.TDC);
+                                        GR_WIRE_U1.push_back(raw.Wire);
+                                        break;
+                                      case 2: // X2 Plane
+                                        GR_TDC_X2.push_back(-raw.TDC);
+                                        GR_WIRE_X2.push_back(raw.Wire);
+                                        break;
+                                      case 3: // U2 Plane
+                                        GR_TDC_U2.push_back(-raw.TDC);
+                                        GR_WIRE_U2.push_back(raw.Wire);
+                                        break;
+                                  }
+                              }
+                              else if(V1190D.IsGeoLAS){
+                                if(raw.Channel == V1190D.GetBaseTimeChannel())
+                                  break;
+                                const Short_t TDC_Offset = 750;
+                                switch(V1190D.GetLASVDCPlane()){
+                                    case 1://X1 plane 
+                                      LAS_TDC_X1.push_back(-raw.TDC - TDC_Offset);
+                                      LAS_WIRE_X1.push_back(V1190D.GetLASVDCWire());
+                                      break;
+                                    case 2://U1 plane 
+                                      LAS_TDC_U1.push_back(-raw.TDC - TDC_Offset);
+                                      LAS_WIRE_U1.push_back(V1190D.GetLASVDCWire());
+                                      break;
+                                    case 3://V1 plane 
+                                      LAS_TDC_V1.push_back(-raw.TDC - TDC_Offset);
+                                      LAS_WIRE_V1.push_back(V1190D.GetLASVDCWire());
+                                      break;
+                                    case 4://X2 plane 
+                                      LAS_TDC_X2.push_back(-raw.TDC - TDC_Offset);
+                                      LAS_WIRE_X2.push_back(V1190D.GetLASVDCWire());
+                                      break;
+                                    case 5://U2 plane 
+                                      LAS_TDC_U2.push_back(-raw.TDC - TDC_Offset);
+                                      LAS_WIRE_U2.push_back(V1190D.GetLASVDCWire());
+                                      break;
+                                    case 6://V2 plane 
+                                      LAS_TDC_V2.push_back(-raw.TDC - TDC_Offset);
+                                      LAS_WIRE_V2.push_back(V1190D.GetLASVDCWire());
+                                }
+                              }
+                            }
+                        break;
+                        
+                        case(V1190D.ID_TDCErrorr):
+                          cerr << "V1190D: TDC-Error!" << endl;
+                        break;
+                        
+                        case(V1190D.ID_TDCTrailer):
+                          insideTDCLoop = false;
+                        break;
+                        
+                        default:
+                          cerr << "Unexpected V1190D Block: " << V1190D.ID << endl;
+                          return;
+                      }
+                    }
+                    
+                    temp = (UInt_t(data[localpos+1]) << 16) | (UInt_t(data[localpos]));
+                    V1190Check.Read(temp);
+                    if(V1190Check.ID == V1190Check.ID_GlobalTrailer){
+                      localpos += 2;
+                      insideGlobalLoop = false;
+                    }
+                }
+            }
+        }
+        break;
+        
         case(R.ID_NimIn):
-            for(Int_t i = pos; i < pos+R.RSize; ++i)
+            for(UInt_t i = pos; i < pos+R.RSize; ++i)
                 IPR.push_back(data[i]);
-            break;
+        break;
             
         case(R.ID_ADC):
-            for(Int_t i = pos; i < pos+R.RSize; ++i)
+            for(UInt_t i = pos; i < pos+R.RSize; ++i)
                 GR_ADC_OLD.push_back(data[i]);
             //GR_ADC_OLD[i-pos] = (data[i]);
-            break;
+        break;
             
         case(R.ID_Scaler):
-            for(Int_t i = pos; i < pos+R.RSize; i+=2){
+            for(UInt_t i = pos; i < pos+R.RSize; i+=2){
                 if(bigEndian)
-                Scaler.push_back(data[i] | (data[i+1] << 16));
+                  Scaler.push_back(data[i] | (data[i+1] << 16));
                 else
-                Scaler.push_back(data[i+1] | (data[i] << 16));
+                  Scaler.push_back(data[i+1] | (data[i] << 16));
             }
-            break;
+        break;
       
         case(R.ID_UNIX_TIME):
             Time = (data[pos] | (data[pos+1] << 16));
-            break;
-
+        break;
+        
         case(R.ID_V830):
-            for(Int_t i = pos; i < pos+R.RSize; i+=2)
+            for(UInt_t i = pos; i < pos+R.RSize; i+=2)
                 GR_V830.push_back(data[i] | (data[i+1] << 16));
             //NOTE Only Debug purpose?
-            break;
+        break;
 
         case(R.ID_FERA_ADC):
-        case(R.ID_FERA_TDC):
+        case(R.ID_FERA_TDC):{
             FeraHeader FH;
             FeraData FD;
-            for(Int_t i = pos; i < pos+R.RSize; ++i){
-                if(FH.IsHeader(data[i])){
-                    FH.Read(data[i]);
-                    FERA_Type.push_back(FH.Type);
-                    FERA_Mid.push_back(FH.Mid);
+            UInt_t header_left = 3;
+            for(UInt_t i = pos; i < pos+R.RSize && header_left > 0; --header_left){
+                if(!FH.IsHeader(data[i]) && R.RSize < 17){
+                    cerr << "Expected a Fera-Header!" << endl;
+                    return;
                 }
-                else{
-                    FD.Read(data[i]);
+                FH.Read(data[i++]);
+                if(R.RSize == 17){ //BUG in the DAQ?
+                  FH.Header = 1;
+                  FH.Count = 16;
+                }
+
+                FERA_Type.push_back(FH.Type);
+                FERA_Mid.push_back(FH.Mid);
+                for(UInt_t j = FH.Count; j > 0; --j){
+                    FD.Read(data[i++]);
                     FERA_Ch.push_back(FD.Channel);
                     if(FH.Type == 0)
                         FERA_RAW.GR_FERA_ADC[FD.Channel+16*FH.Mid] = FD.Data;
@@ -297,45 +607,45 @@ void RCNP_Detector::Process(const vector< UShort_t >& data)
                     else if(FH.Type == 8)
                         FERA_RAW.GR_FERA_TDC[FD.Channel+16*FH.Mid] = FD.Data;
                     else if(FH.Type == 9)
-                        FERA_RAW.LAS_FERA_ADC[FD.Channel+16*FH.Mid] = FD.Data;
+                        FERA_RAW.LAS_FERA_TDC[FD.Channel+16*FH.Mid] = FD.Data;
                 }
             }
-            break;
+        }
+        break;
             
         case(R.ID_CHKSUM):
-            ChkSum = data[pos];
-            break;
+          ChkSum = data[pos];
+        break;
             
         default:
             cout << "Unhandeld Region found: " << hex << R.RID << endl;
     }
     pos += R.RSize;
   }
-  
   EVENT.EVENT_COIN = IPR[0] & (1 << 8);
   EVENT.EVENT_GR = (IPR[0] & (1 << 5)) || EVENT.EVENT_COIN;
   EVENT.EVENT_LAS = (IPR[0] & (1 << 7)) || EVENT.EVENT_COIN;
   
   
-  GR.GR_ADC[0] = FERA_RAW.GR_FERA_ADC[0x10];
-  GR.GR_ADC[1] = FERA_RAW.GR_FERA_ADC[0x11];
-  GR.GR_ADC[2] = FERA_RAW.GR_FERA_ADC[0x12];
-  GR.GR_ADC[3] = FERA_RAW.GR_FERA_ADC[0x13];
-  GR.GR_ADC[4] = FERA_RAW.GR_FERA_ADC[0x20];
-  GR.GR_ADC[5] = FERA_RAW.GR_FERA_ADC[0x28];
+  GR.GR_ADC[0] = FERA_RAW.GR_FERA_ADC[16];
+  GR.GR_ADC[1] = FERA_RAW.GR_FERA_ADC[17];
+  GR.GR_ADC[2] = FERA_RAW.GR_FERA_ADC[18];
+  GR.GR_ADC[3] = FERA_RAW.GR_FERA_ADC[19];
+  GR.GR_ADC[4] = FERA_RAW.GR_FERA_ADC[32];
+  GR.GR_ADC[5] = FERA_RAW.GR_FERA_ADC[40];
   GR.GR_MADC[0] = sqrt(GR.GR_ADC[1]*GR.GR_ADC[0]);
   GR.GR_MADC[1] = sqrt(GR.GR_ADC[3]*GR.GR_ADC[2]);
   GR.GR_MADC[2] = sqrt(GR.GR_ADC[5]*GR.GR_ADC[4]);
-  GR.GR_TDC[0] = FERA_RAW.GR_FERA_TDC[0x10];
-  GR.GR_TDC[1] = FERA_RAW.GR_FERA_TDC[0x11];
-  GR.GR_TDC[2] = FERA_RAW.GR_FERA_TDC[0x12];
-  GR.GR_TDC[3] = FERA_RAW.GR_FERA_TDC[0x13];
-  GR.GR_TDC[4] = FERA_RAW.GR_FERA_TDC[0x20];
-  GR.GR_TDC[5] = FERA_RAW.GR_FERA_TDC[0x28];
-  GR.GR_RF[0] = FERA_RAW.GR_FERA_TDC[0x18];
-  GR.GR_RF[1] = FERA_RAW.GR_FERA_TDC[0x19];
-  GR.GR_RF[2] = FERA_RAW.GR_FERA_TDC[0x1a];
-  GR.GR_TLAS = FERA_RAW.GR_FERA_TDC[0x15];
+  GR.GR_TDC[0] = FERA_RAW.GR_FERA_TDC[16];
+  GR.GR_TDC[1] = FERA_RAW.GR_FERA_TDC[17];
+  GR.GR_TDC[2] = FERA_RAW.GR_FERA_TDC[18];
+  GR.GR_TDC[3] = FERA_RAW.GR_FERA_TDC[19];
+  GR.GR_TDC[4] = FERA_RAW.GR_FERA_TDC[32];
+  GR.GR_TDC[5] = FERA_RAW.GR_FERA_TDC[40];
+  GR.GR_RF[0] = FERA_RAW.GR_FERA_TDC[24];
+  GR.GR_RF[1] = FERA_RAW.GR_FERA_TDC[25];
+  GR.GR_RF[2] = FERA_RAW.GR_FERA_TDC[26];
+  GR.GR_TLAS = FERA_RAW.GR_FERA_TDC[21];
   GR.R_TDIFF[0] = GR.GR_TDC[1]-GR.GR_TDC[0];
   GR.R_TDIFF[1] = GR.GR_TDC[3]-GR.GR_TDC[2];
   GR.R_TDIFF[2] = GR.GR_TDC[5]-GR.GR_TDC[4];
@@ -476,11 +786,36 @@ void RCNP_Detector::Clear()
   IPR.clear();
   GR_ADC_OLD.clear();
   Scaler.clear();
-  GR_V830 .clear();
+  GR_V830.clear();
   FERA_Type.clear();
   FERA_Ch.clear();
   FERA_Mid.clear();
   Time = 0;
   ChkSum = 0;
   FERA_RAW.Clear();
+  V1190_RAW.clear();
+  
+  GR_WIRE_X1.clear();
+  GR_WIRE_U1.clear();
+  GR_WIRE_X2.clear();
+  GR_WIRE_U2.clear();
+  GR_TDC_X1.clear();
+  GR_TDC_U1.clear();
+  GR_TDC_X2.clear();
+  GR_TDC_U2.clear();
+  
+  LAS_WIRE_X1.clear();
+  LAS_WIRE_U1.clear();
+  LAS_WIRE_V1.clear();
+  LAS_WIRE_X2.clear();
+  LAS_WIRE_U2.clear();
+  LAS_WIRE_V2.clear();
+  LAS_TDC_X1.clear();
+  LAS_TDC_U1.clear();
+  LAS_TDC_V1.clear();
+  LAS_TDC_X2.clear();
+  LAS_TDC_U2.clear();
+  LAS_TDC_V2.clear();
+  
+  memset(&V1190_QTC, 0, sizeof(V1190_QTC));
 }

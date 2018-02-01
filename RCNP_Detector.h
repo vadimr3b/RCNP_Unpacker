@@ -54,6 +54,13 @@ struct _LAS{
   UShort_t LAS_TDIFF[6];
 };
 
+struct _V1190_RAW{
+  Float_t TDC;
+  UShort_t Geo;
+  UShort_t Channel;
+  Short_t Wire;
+};
+
 class RCNP_Detector : public Detector{
 public:
   RCNP_Detector();
