@@ -259,7 +259,7 @@ struct V1190Data{
   
   /*TDC Measurement (ID == 0)*/
   static constexpr UShort_t ID_TDCMeasurment = 0;
-  UInt_t Measurement;
+  Int_t Measurement;
   UShort_t Channel;
   UShort_t TrailingEdge; /*0 = leading, 1 = trailing*/
   
@@ -324,6 +324,8 @@ void RCNP_Detector::RegisterData(TTree& tree)
   tree.Branch("LAS_TDC_X2", &LAS_TDC_X2);
   tree.Branch("LAS_TDC_U2", &LAS_TDC_U2);
   tree.Branch("LAS_TDC_V2", &LAS_TDC_V2);
+  
+  tree.Branch("V1190_QTC", &V1190_QTC, "V1190_QTC[16][2]/I");
   //tree.Branch("BLP", &BLP_ADC, "BLP_ADC[8]/s");
   
   Clear();
@@ -387,7 +389,7 @@ void RCNP_Detector::Process(const vector< UShort_t >& data)
                       
                       switch(V1190D.ID){
                         case(V1190D.ID_TDCMeasurment):
-                          if(!V1190D.TrailingEdge){
+                          if(!V1190D.TrailingEdge && V1190D.Geo >= 0 && V1190D.Geo < V1190_MAX_N_MODULES){
                             if(V1190D.IsGeoGR || V1190D.IsGeoLAS)
                               if(V1190D.Channel == V1190D.GetBaseTimeChannel())
                                 BaseTime[V1190D.Geo] = V1190D.Measurement;
@@ -459,14 +461,15 @@ void RCNP_Detector::Process(const vector< UShort_t >& data)
                             raw.Wire = V1190D.GetWire(raw.Geo, raw.Channel);
                             if(BaseTime[raw.Geo] == -10000 && raw.Geo != 10)
                               cerr << "BaseTime Error!" << endl;
+                            
                             raw.TDC = (V1190D.Measurement - BaseTime[raw.Geo])/10.0;
                             if(V1190D.Channel > 0)
                               V1190_RAW.push_back(raw);
                             if(raw.Geo == 0 && (96 <= raw.Channel && raw.Channel < 112)){
                               if(V1190D.TrailingEdge)
-                                V1190_QTC[raw.Channel - 96][1] = raw.TDC - BaseTime[raw.Geo];
+                                V1190_QTC[raw.Channel - 96][1] = V1190D.Measurement - BaseTime[raw.Geo];
                               else
-                                V1190_QTC[raw.Channel - 96][0] = raw.TDC - BaseTime[raw.Geo];
+                                V1190_QTC[raw.Channel - 96][0] = V1190D.Measurement - BaseTime[raw.Geo];
                             }
                             
                             if(!V1190D.TrailingEdge){
@@ -494,31 +497,33 @@ void RCNP_Detector::Process(const vector< UShort_t >& data)
                               else if(V1190D.IsGeoLAS){
                                 if(raw.Channel == V1190D.GetBaseTimeChannel())
                                   break;
-                                const Short_t TDC_Offset = 750;
-                                switch(V1190D.GetLASVDCPlane()){
-                                    case 1://X1 plane 
-                                      LAS_TDC_X1.push_back(-raw.TDC - TDC_Offset);
-                                      LAS_WIRE_X1.push_back(V1190D.GetLASVDCWire());
-                                      break;
-                                    case 2://U1 plane 
-                                      LAS_TDC_U1.push_back(-raw.TDC - TDC_Offset);
-                                      LAS_WIRE_U1.push_back(V1190D.GetLASVDCWire());
-                                      break;
-                                    case 3://V1 plane 
-                                      LAS_TDC_V1.push_back(-raw.TDC - TDC_Offset);
-                                      LAS_WIRE_V1.push_back(V1190D.GetLASVDCWire());
-                                      break;
-                                    case 4://X2 plane 
-                                      LAS_TDC_X2.push_back(-raw.TDC - TDC_Offset);
-                                      LAS_WIRE_X2.push_back(V1190D.GetLASVDCWire());
-                                      break;
-                                    case 5://U2 plane 
-                                      LAS_TDC_U2.push_back(-raw.TDC - TDC_Offset);
-                                      LAS_WIRE_U2.push_back(V1190D.GetLASVDCWire());
-                                      break;
-                                    case 6://V2 plane 
-                                      LAS_TDC_V2.push_back(-raw.TDC - TDC_Offset);
-                                      LAS_WIRE_V2.push_back(V1190D.GetLASVDCWire());
+                                if(raw.Wire >= 0){
+                                  const Short_t TDC_Offset = 750;
+                                  switch(V1190D.GetLASVDCPlane()){
+                                      case 1://X1 plane 
+                                        LAS_TDC_X1.push_back(-raw.TDC - TDC_Offset);
+                                        LAS_WIRE_X1.push_back(V1190D.GetLASVDCWire());
+                                        break;
+                                      case 2://U1 plane 
+                                        LAS_TDC_U1.push_back(-raw.TDC - TDC_Offset);
+                                        LAS_WIRE_U1.push_back(V1190D.GetLASVDCWire());
+                                        break;
+                                      case 3://V1 plane 
+                                        LAS_TDC_V1.push_back(-raw.TDC - TDC_Offset);
+                                        LAS_WIRE_V1.push_back(V1190D.GetLASVDCWire());
+                                        break;
+                                      case 4://X2 plane 
+                                        LAS_TDC_X2.push_back(-raw.TDC - TDC_Offset);
+                                        LAS_WIRE_X2.push_back(V1190D.GetLASVDCWire());
+                                        break;
+                                      case 5://U2 plane 
+                                        LAS_TDC_U2.push_back(-raw.TDC - TDC_Offset);
+                                        LAS_WIRE_U2.push_back(V1190D.GetLASVDCWire());
+                                        break;
+                                      case 6://V2 plane 
+                                        LAS_TDC_V2.push_back(-raw.TDC - TDC_Offset);
+                                        LAS_WIRE_V2.push_back(V1190D.GetLASVDCWire());
+                                  }
                                 }
                               }
                             }
