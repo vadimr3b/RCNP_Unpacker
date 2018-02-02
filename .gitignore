@@ -6,3 +6,5 @@ main\.o
 unpacker
 
 *.o
+
+calibrator
