@@ -10,7 +10,8 @@ extern Bool_t bigEndian;
 
 vector<UShort_t> RegionIDs;
 
-vector<UShort_t> IPR;
+vector<UShort_t> IPR_vector;
+UInt_t IPR;
 
 vector<UShort_t> GR_ADC_OLD;
 vector<UInt_t> GR_V830;
@@ -48,7 +49,6 @@ vector<Float_t> LAS_TDC_X2;
 vector<Float_t> LAS_TDC_U2;
 vector<Float_t> LAS_TDC_V2;
 
-vector<_V1190_RAW> V1190_RAW;
 Int_t V1190_QTC[16][2];
 
 vector<UInt_t> Scaler;
@@ -222,20 +222,21 @@ struct V1190Data{
   }
   
   Short_t GetLASVDCWire(){
-      if(Geo==11){
-        if(32 <= Channel && Channel < 64){
-                return 16*16 + (Channel-32);
-        }else if(96 <= Channel && Channel < 128)
-                return 16*16+(Channel - 96);
-      }
-      else
+    if(Geo == 11 && 48 <= Channel && Channel < 64)
+        return 16*3  + Channel - 48;
+    else if(Geo == 16 && 48 <= Channel && Channel < 64)
+        return 16*16 + Channel - 48;
+    else if(Geo == 11){
+        if(32 <= Channel && Channel < 64)
+            return 16*15 + (Channel - 32);
+        else if(96 <= Channel && Channel < 128)
+            return 16*15 + (Channel - 96);
+    }else{
         return (Geo%2)*128 + Channel;
-      
-      cerr << "Bad Wire!!!" << endl;
-      return -1;
+    }
+    cerr << "Bad Wire!" << endl;
+    return -1;
   }
-  
-
   
   static constexpr UShort_t GR_BASE_TIME_CHANNEL = 127;
   static constexpr UShort_t LAS_EVEN_BASE_TIME_CHANNEL = 0;
@@ -287,18 +288,18 @@ RCNP_Detector::RCNP_Detector()
 
 void RCNP_Detector::RegisterData(TTree& tree)
 {
-  tree.Branch("RegionIDs", &RegionIDs);
-  tree.Branch("GR_V830", &GR_V830);
+  //tree.Branch("RegionIDs", &RegionIDs);
+  //tree.Branch("GR_V830", &GR_V830);
   tree.Branch("IPR", &IPR);
   tree.Branch("Scaler", &Scaler);
-  tree.Branch("Time", &Time);
-  tree.Branch("ChkSum", &ChkSum);
-  tree.Branch("FERA_Type", &FERA_Type);
-  tree.Branch("FERA_Ch", &FERA_Ch);
-  tree.Branch("FERA_Mid", &FERA_Mid);
+  //tree.Branch("Time", &Time);
+  //tree.Branch("ChkSum", &ChkSum);
+  //tree.Branch("FERA_Type", &FERA_Type);
+  //tree.Branch("FERA_Ch", &FERA_Ch);
+  //tree.Branch("FERA_Mid", &FERA_Mid);
   tree.Branch("EVENT", &EVENT, "EVENT_GR/O:EVENT_LAS:EVENT_COIN");
   tree.Branch("GR", &GR, "GR_ADC[6]/s:GR_MADC[3]:GR_TDC[6]:GR_RF[3]:GR_TLAS:GR_DIFF[3]");
-  tree.Branch("GF", &GF, "GF_ADC_XU[8]/s:GF_ADC_XD[8]:GF_ADC_YL[5]:GF_ADC_YR[5]:GF_MADC_X[8]:GF_MADC_Y[5]:GF_TDC_XU[8]:GF_TDC_XD[8]:GF_TDC_YL[5]:GF_TDC_YR[5]:GF_TDIFF_X[8]:GF_TDIFF_Y[5]");
+  //tree.Branch("GF", &GF, "GF_ADC_XU[8]/s:GF_ADC_XD[8]:GF_ADC_YL[5]:GF_ADC_YR[5]:GF_MADC_X[8]:GF_MADC_Y[5]:GF_TDC_XU[8]:GF_TDC_XD[8]:GF_TDC_YL[5]:GF_TDC_YR[5]:GF_TDIFF_X[8]:GF_TDIFF_Y[5]");
   tree.Branch("LAS", &LAS, "LAS_ADC[12]/s:LAS_MADC[6]:LAS_TDC[12]:LAS_RF[3]:LAS_TDIFF[6]");
   
   tree.Branch("GR_WIRE_X1", &GR_WIRE_X1);
@@ -330,7 +331,6 @@ void RCNP_Detector::RegisterData(TTree& tree)
   
   Clear();
 }
-#include <bitset>
 
 void RCNP_Detector::Process(const vector< UShort_t >& data)
 {
@@ -369,13 +369,13 @@ void RCNP_Detector::Process(const vector< UShort_t >& data)
                     localpos += 2;
                     V1190D.Read(temp);
                     if(V1190D.ID != V1190D.ID_TDCHeader){
-                      cerr << "Expected V1190D TDC-Header! " << V1190D.ID << endl;
+                      //cerr << "Expected V1190D TDC-Header! " << V1190D.ID << endl;
                       if(V1190D.ID != V1190D.ID_GlobalHeader)
                         return;
                       temp = (UInt_t(data[localpos+1]) << 16) | (UInt_t(data[localpos]));
                       localpos += 2;
                       V1190D.Read(temp);
-                      if(V1190D.ID != V1190D.ID_TDCHeader){
+                      if(V1190D.ID != V1190D.ID_TDCHeader){ //BUG?
                         cerr << "Data broken... skipping field!" << endl;
                         return;
                       }
@@ -436,7 +436,7 @@ void RCNP_Detector::Process(const vector< UShort_t >& data)
                     localpos += 2;
                     V1190D.Read(temp);
                     if(V1190D.ID != V1190D.ID_TDCHeader){
-                      cerr << "Expected V1190D TDC-Header! " << V1190D.ID << endl;
+                      //cerr << "Expected V1190D TDC-Header! " << V1190D.ID << endl;
                       if(V1190D.ID != V1190D.ID_GlobalHeader)
                         return;
                       temp = (UInt_t(data[localpos+1]) << 16) | (UInt_t(data[localpos]));
@@ -461,85 +461,85 @@ void RCNP_Detector::Process(const vector< UShort_t >& data)
                             raw.Wire = V1190D.GetWire(raw.Geo, raw.Channel);
                             if(BaseTime[raw.Geo] == -10000 && raw.Geo != 10)
                               cerr << "BaseTime Error!" << endl;
-                            
-                            raw.TDC = (V1190D.Measurement - BaseTime[raw.Geo])/10.0;
-                            if(V1190D.Channel > 0)
-                              V1190_RAW.push_back(raw);
-                            if(raw.Geo == 0 && (96 <= raw.Channel && raw.Channel < 112)){
-                              if(V1190D.TrailingEdge)
-                                V1190_QTC[raw.Channel - 96][1] = V1190D.Measurement - BaseTime[raw.Geo];
-                              else
-                                V1190_QTC[raw.Channel - 96][0] = V1190D.Measurement - BaseTime[raw.Geo];
-                            }
-                            
-                            if(!V1190D.TrailingEdge){
-                              if(V1190D.IsGeoGR){
-                                if(raw.Wire >= 0)
-                                  switch(V1190D.GetGRVDCPlane(raw.Geo, raw.Channel)){
-                                      case 0: // X1 Plane
-                                        GR_TDC_X1.push_back(-raw.TDC);
-                                        GR_WIRE_X1.push_back(raw.Wire);
-                                        break;
-                                      case 1: // U1 Plane
-                                        GR_TDC_U1.push_back(-raw.TDC);
-                                        GR_WIRE_U1.push_back(raw.Wire);
-                                        break;
-                                      case 2: // X2 Plane
-                                        GR_TDC_X2.push_back(-raw.TDC);
-                                        GR_WIRE_X2.push_back(raw.Wire);
-                                        break;
-                                      case 3: // U2 Plane
-                                        GR_TDC_U2.push_back(-raw.TDC);
-                                        GR_WIRE_U2.push_back(raw.Wire);
-                                        break;
-                                  }
+                            else{
+                              raw.TDC = (V1190D.Measurement - BaseTime[raw.Geo])/10.0;
+                              if(V1190D.Channel > 0)
+                              if(raw.Geo == 0 && (96 <= raw.Channel && raw.Channel < 112)){
+                                if(V1190D.TrailingEdge)
+                                  V1190_QTC[raw.Channel - 96][1] = V1190D.Measurement - BaseTime[raw.Geo];
+                                else
+                                  V1190_QTC[raw.Channel - 96][0] = V1190D.Measurement - BaseTime[raw.Geo];
                               }
-                              else if(V1190D.IsGeoLAS){
-                                if(raw.Channel == V1190D.GetBaseTimeChannel())
-                                  break;
-                                if(raw.Wire >= 0){
-                                  const Short_t TDC_Offset = 750;
-                                  switch(V1190D.GetLASVDCPlane()){
-                                      case 1://X1 plane 
-                                        LAS_TDC_X1.push_back(-raw.TDC - TDC_Offset);
-                                        LAS_WIRE_X1.push_back(V1190D.GetLASVDCWire());
-                                        break;
-                                      case 2://U1 plane 
-                                        LAS_TDC_U1.push_back(-raw.TDC - TDC_Offset);
-                                        LAS_WIRE_U1.push_back(V1190D.GetLASVDCWire());
-                                        break;
-                                      case 3://V1 plane 
-                                        LAS_TDC_V1.push_back(-raw.TDC - TDC_Offset);
-                                        LAS_WIRE_V1.push_back(V1190D.GetLASVDCWire());
-                                        break;
-                                      case 4://X2 plane 
-                                        LAS_TDC_X2.push_back(-raw.TDC - TDC_Offset);
-                                        LAS_WIRE_X2.push_back(V1190D.GetLASVDCWire());
-                                        break;
-                                      case 5://U2 plane 
-                                        LAS_TDC_U2.push_back(-raw.TDC - TDC_Offset);
-                                        LAS_WIRE_U2.push_back(V1190D.GetLASVDCWire());
-                                        break;
-                                      case 6://V2 plane 
-                                        LAS_TDC_V2.push_back(-raw.TDC - TDC_Offset);
-                                        LAS_WIRE_V2.push_back(V1190D.GetLASVDCWire());
+                              
+                              if(!V1190D.TrailingEdge){
+                                if(V1190D.IsGeoGR){
+                                  if(raw.Wire >= 0)
+                                    switch(V1190D.GetGRVDCPlane(raw.Geo, raw.Channel)){
+                                        case 0: // X1 Plane
+                                          GR_TDC_X1.push_back(-raw.TDC);
+                                          GR_WIRE_X1.push_back(raw.Wire);
+                                          break;
+                                        case 1: // U1 Plane
+                                          GR_TDC_U1.push_back(-raw.TDC);
+                                          GR_WIRE_U1.push_back(raw.Wire);
+                                          break;
+                                        case 2: // X2 Plane
+                                          GR_TDC_X2.push_back(-raw.TDC);
+                                          GR_WIRE_X2.push_back(raw.Wire);
+                                          break;
+                                        case 3: // U2 Plane
+                                          GR_TDC_U2.push_back(-raw.TDC);
+                                          GR_WIRE_U2.push_back(raw.Wire);
+                                          break;
+                                    }
+                                }
+                                else if(V1190D.IsGeoLAS){
+                                  if(raw.Channel == V1190D.GetBaseTimeChannel())
+                                    break;
+                                  if(V1190D.GetLASVDCWire() >= 0){
+                                    const Short_t TDC_Offset = 750;
+                                    switch(V1190D.GetLASVDCPlane()){
+                                        case 1://X1 plane 
+                                          LAS_TDC_X1.push_back(-raw.TDC - TDC_Offset);
+                                          LAS_WIRE_X1.push_back(V1190D.GetLASVDCWire());
+                                          break;
+                                        case 2://U1 plane 
+                                          LAS_TDC_U1.push_back(-raw.TDC - TDC_Offset);
+                                          LAS_WIRE_U1.push_back(V1190D.GetLASVDCWire());
+                                          break;
+                                        case 3://V1 plane 
+                                          LAS_TDC_V1.push_back(-raw.TDC - TDC_Offset);
+                                          LAS_WIRE_V1.push_back(V1190D.GetLASVDCWire());
+                                          break;
+                                        case 4://X2 plane 
+                                          LAS_TDC_X2.push_back(-raw.TDC - TDC_Offset);
+                                          LAS_WIRE_X2.push_back(V1190D.GetLASVDCWire());
+                                          break;
+                                        case 5://U2 plane 
+                                          LAS_TDC_U2.push_back(-raw.TDC - TDC_Offset);
+                                          LAS_WIRE_U2.push_back(V1190D.GetLASVDCWire());
+                                          break;
+                                        case 6://V2 plane 
+                                          LAS_TDC_V2.push_back(-raw.TDC - TDC_Offset);
+                                          LAS_WIRE_V2.push_back(V1190D.GetLASVDCWire());
+                                    }
                                   }
                                 }
                               }
-                            }
-                        break;
-                        
-                        case(V1190D.ID_TDCErrorr):
-                          cerr << "V1190D: TDC-Error!" << endl;
-                        break;
-                        
-                        case(V1190D.ID_TDCTrailer):
-                          insideTDCLoop = false;
-                        break;
-                        
-                        default:
-                          cerr << "Unexpected V1190D Block: " << V1190D.ID << endl;
-                          return;
+                          break;
+                          
+                          case(V1190D.ID_TDCErrorr):
+                            cerr << "V1190D: TDC-Error!" << endl;
+                          break;
+                          
+                          case(V1190D.ID_TDCTrailer):
+                            insideTDCLoop = false;
+                          break;
+                          
+                          default:
+                            cerr << "Unexpected V1190D Block: " << V1190D.ID << endl;
+                            return;
+                        }
                       }
                     }
                     
@@ -556,7 +556,7 @@ void RCNP_Detector::Process(const vector< UShort_t >& data)
         
         case(R.ID_NimIn):
             for(UInt_t i = pos; i < pos+R.RSize; ++i)
-                IPR.push_back(data[i]);
+                IPR_vector.push_back(data[i]);
         break;
             
         case(R.ID_ADC):
@@ -627,10 +627,14 @@ void RCNP_Detector::Process(const vector< UShort_t >& data)
     }
     pos += R.RSize;
   }
-  EVENT.EVENT_COIN = IPR[0] & (1 << 8);
-  EVENT.EVENT_GR = (IPR[0] & (1 << 5)) || EVENT.EVENT_COIN;
-  EVENT.EVENT_LAS = (IPR[0] & (1 << 7)) || EVENT.EVENT_COIN;
+  if(IPR_vector.size() == 2)
+    IPR = (UInt_t(IPR_vector[1]) << 16) | IPR_vector[0];
+  else
+    IPR = IPR_vector[0];
   
+  EVENT.EVENT_COIN = IPR_vector[0] & (1 << 8);
+  EVENT.EVENT_GR = (IPR_vector[0] & (1 << 5)) || EVENT.EVENT_COIN;
+  EVENT.EVENT_LAS = (IPR_vector[0] & (1 << 7)) || EVENT.EVENT_COIN;
   
   GR.GR_ADC[0] = FERA_RAW.GR_FERA_ADC[16];
   GR.GR_ADC[1] = FERA_RAW.GR_FERA_ADC[17];
@@ -788,7 +792,7 @@ void RCNP_Detector::Process(const vector< UShort_t >& data)
 void RCNP_Detector::Clear()
 {
   RegionIDs.clear();
-  IPR.clear();
+  IPR_vector.clear();
   GR_ADC_OLD.clear();
   Scaler.clear();
   GR_V830.clear();
@@ -798,7 +802,6 @@ void RCNP_Detector::Clear()
   Time = 0;
   ChkSum = 0;
   FERA_RAW.Clear();
-  V1190_RAW.clear();
   
   GR_WIRE_X1.clear();
   GR_WIRE_U1.clear();
