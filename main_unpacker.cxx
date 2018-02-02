@@ -10,18 +10,19 @@ using std::endl;
 int main(const int narg, const char* argv[]){
   if(narg < 2){
     cout << "No target to unpack..." << endl;
+    cout << "Usage: unpacker [-d /directory/for/rootfiles/] [-n number_of_events_to_unpack] file1.bld file2.bld ...";
     return -1;
   }
   
   std::vector<TString> targets;
   
-  uint32_t maxblocks = -1;
+  uint32_t maxevents = -1;
   TString tarDir ="";
   
   for(int i = 1; i < narg; ++i){
     TString str = argv[i];
     if(str.EqualTo("-n"))
-        maxblocks = std::atoi(argv[++i]);
+        maxevents = std::atoi(argv[++i]);
     else if(str.EqualTo("-d"))
         tarDir = argv[++i];
     else
@@ -50,7 +51,7 @@ int main(const int narg, const char* argv[]){
     
     u.AddDetector(&rcnp);
     
-    STATUS s = u.Unpack(targets[i], fout, maxblocks);
+    STATUS s = u.Unpack(targets[i], fout, maxevents);
     cout << endl;
     switch(s){
       case STATUS::ERR_OPEN                             : cout << "Error: Could not open '" << fname << "'"                << endl; break;

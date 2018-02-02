@@ -32,7 +32,7 @@ public:
          this->name = name;
     }
     
-    STATUS Unpack(TString& filein, TString& fileout, uint32_t maxblocks = -1);
+    STATUS Unpack(TString& filein, TString& fileout, uint32_t maxevents = -1);
 
 private:
     TString name;

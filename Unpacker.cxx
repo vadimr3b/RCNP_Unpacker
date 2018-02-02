@@ -309,7 +309,7 @@ struct FieldHeader{
     static constexpr UShort_t _HSize = 4;
 };
 
-STATUS Unpacker::Unpack(TString& filein, TString& fileout, uint32_t maxblocks)
+STATUS Unpacker::Unpack(TString& filein, TString& fileout, uint32_t maxevents)
 {
     
     gzFile ifs(gzopen(filein, "rb"));
@@ -330,7 +330,9 @@ STATUS Unpacker::Unpack(TString& filein, TString& fileout, uint32_t maxblocks)
     BlockTrailer BT;
     UShort_t temp;
     
-    while(BH.__BlockNumber < maxblocks && !gzeof(ifs)){
+    UInt_t eventcounter = 0;
+    
+    while(!gzeof(ifs)){
         BLDH.Read(ifs);
         if(BLDH.IsBLD1Format()){
             #ifdef DEBUG
@@ -370,7 +372,6 @@ STATUS Unpacker::Unpack(TString& filein, TString& fileout, uint32_t maxblocks)
                 BH.BSize32 -= RC._HSize;
             }
             else if((BH.BID & (~7)) == BH._DataBlock){
-                cout << "\r" << BH.__BlockNumber << " Blocks processed!" << flush;
                 #ifdef DEBUG
                 cout << "Reading Block #" << dec << BH.BlockNumber << endl;
                 #endif 
@@ -379,9 +380,13 @@ STATUS Unpacker::Unpack(TString& filein, TString& fileout, uint32_t maxblocks)
                       fout.Write();
                       return DONE;
                     }
-                      
                     if(!EH.Read(ifs)) return ERR_UNKNOWN_DATA_STRUCTURE;
                     BH.BSize32 -= EH._HSize + EH.ESize;
+                    cout << "\r" << eventcounter << " Events processed!" << flush;
+                    if(maxevents < eventcounter++){
+                      fout.Write();
+                      return DONE;
+                    }
                     #ifdef DEBUG
                     cout << "  Reading Event #" << dec << EH.EventNumber  << " (" << hex << EH._HSize + EH.ESize << ")   (Bsize left: " << hex << BH.BSize32 << ")" << endl;
                     #endif

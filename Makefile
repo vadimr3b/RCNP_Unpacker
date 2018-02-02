@@ -6,10 +6,14 @@ SOFLAGS   = -fPIC -shared
 .PHONY: all
 all: unpacker
 
-unpacker: main.o Unpacker.o RCNP_Detector.o
+unpacker: main_unpacker.o Unpacker.o RCNP_Detector.o
 	@echo "Buildung 'unpacker'..."
 	@$(CXX) -o $@ $^ $(LDFLAGS) -lz -O3
 
+calibrator: main_calibrator.o Calibrator.o
+	@echo "Buildung 'calibrator'..."
+	@$(CXX) -o $@ $^ $(LDFLAGS) -lz -O3
+	
 .PHONY: clean
 clean: 
 	@rm -f *.o unpacker

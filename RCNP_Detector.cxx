@@ -6,6 +6,8 @@ using std::cerr;
 using std::endl;
 using std::hex;
 
+#include "RCNPTree_Raw.h"
+
 extern Bool_t bigEndian;
 
 vector<UShort_t> RegionIDs;
@@ -459,8 +461,9 @@ void RCNP_Detector::Process(const vector< UShort_t >& data)
                         case(V1190D.ID_TDCMeasurment):
                             raw.Channel = V1190D.Channel;
                             raw.Wire = V1190D.GetWire(raw.Geo, raw.Channel);
-                            if(BaseTime[raw.Geo] == -10000 && raw.Geo != 10)
-                              cerr << "BaseTime Error!" << endl;
+                            if(BaseTime[raw.Geo] == -10000 && raw.Geo != 10){
+                              //cerr << "BaseTime Error!" << endl;
+                            }
                             else{
                               raw.TDC = (V1190D.Measurement - BaseTime[raw.Geo])/10.0;
                               if(V1190D.Channel > 0)
